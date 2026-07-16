@@ -1,0 +1,514 @@
+# Backend Architecture Design: Collaborative AI Code Editor
+
+> [!NOTE]
+> This document outlines the complete, production-grade backend architecture for the Online Collaborative AI Code Editor. It serves as the foundational blueprint for all subsequent development, ensuring modularity, scalability, and maintainability.
+
+## 1. High-Level Architecture Diagram
+
+```mermaid
+graph TD
+    Client[Frontend Clients]
+    
+    subgraph LoadBalancer [Load Balancer / API Gateway]
+        Nginx[Nginx / AWS ALB]
+    end
+    
+    subgraph APIServer [Express.js API Nodes]
+        Router[REST Router]
+        SocketIO[Socket.IO Layer]
+        Controllers[Controllers]
+        Services[Business Services]
+        Repositories[Data Repositories]
+    end
+    
+    subgraph DataLayer [Data Layer]
+        PG[(PostgreSQL)]
+        RedisCache[(Redis Cluster)]
+    end
+    
+    subgraph BackgroundWorkers [Worker Nodes]
+        BullMQ[BullMQ Processor]
+        WorkerServices[Worker Services]
+    end
+    
+    subgraph ExternalServices [External Integrations]
+        GitHub[GitHub API]
+        OpenAI[AI Models]
+        CompilerApi[Remote Compiler Environment]
+        OAuth[Google OAuth]
+    end
+
+    Client -->|HTTP/REST| Nginx
+    Client -->|WebSocket| Nginx
+    
+    Nginx -->|HTTP| Router
+    Nginx -->|WS| SocketIO
+    
+    Router --> Controllers
+    Controllers --> Services
+    SocketIO --> Services
+    
+    Services --> Repositories
+    Repositories --> PG
+    
+    Services --> RedisCache
+    SocketIO --> RedisCache
+    
+    Services --> BullMQ
+    BullMQ --> WorkerServices
+    
+    WorkerServices --> RedisCache
+    WorkerServices --> Repositories
+    
+    WorkerServices --> GitHub
+    WorkerServices --> OpenAI
+    WorkerServices --> CompilerApi
+    
+    Services --> OAuth
+```
+
+## 2. Layer Responsibilities
+
+To maintain high cohesiveness and loose coupling (Clean Architecture principles), the backend is divided into strict layers:
+
+- **API Layer (Controllers/Routes)**: Responsible strictly for receiving HTTP requests, extracting payloads, invoking the Service Layer, and returning standardized HTTP responses. It handles no business logic.
+- **Socket Layer**: Manages WebSocket connections, namespaces, and socket authentication. It maps incoming real-time events to Service Layer methods and broadcasts state changes back to connected clients.
+- **Service Layer**: The heart of the application containing all core business rules. It coordinates between repositories, cache, and external APIs. Services are completely agnostic of the transport layer (HTTP vs. WebSockets).
+- **Repository Layer**: Encapsulates all interactions with PostgreSQL via Prisma. It provides a clean interface for data access (CRUD operations) and hides complex queries from the services.
+- **Worker Layer**: Executes resource-intensive or long-running tasks asynchronously off the main Node.js event loop using BullMQ.
+- **Cache Layer (Redis)**: Handles ephemeral data storage, rate limiting, session tracking, and acts as the Pub/Sub broker to synchronize Socket.IO events across horizontally scaled API nodes.
+- **Shared Utilities**: Contains common cross-cutting concerns like logging (Pino), error classes, authentication guards, and validation functions.
+- **Middleware Layer**: Express middlewares for request interception, such as JWT verification, rate limiting, and global error handling.
+- **Configuration Layer**: Validates and exports environment variables ensuring the app fails fast on boot if misconfigured.
+
+## 3. Backend Folder Structure
+
+We follow a **Feature-Based Architecture**. Grouping by feature rather than layer makes it drastically easier to extract microservices later if the system scales massively.
+
+```text
+src/
+├── config/                # Environment validation, app constants
+├── core/                  # Cross-cutting concerns
+│   ├── errors/            # Custom error classes
+│   ├── logger/            # Pino logger setup
+│   ├── middleware/        # Global Express middlewares
+│   └── utils/             # Helper functions
+├── modules/               # Feature-based domains
+│   ├── auth/              
+│   │   ├── controllers.js # REST Controllers
+│   │   ├── routes.js      # Express Routes
+│   │   ├── services.js    # Business logic
+│   │   ├── repositories.js# DB access (Prisma wrappers)
+│   │   ├── dto.js         # Zod schemas for input validation
+│   │   ├── types.js       # TypeScript-like JSDoc / Type definitions
+│   │   └── tests/         # Unit & integration tests
+│   ├── user/
+│   ├── room/
+│   ├── editor/            
+│   │   ├── socket.js      # Socket event handlers specific to the editor
+│   │   ├── events.js      # Event constants
+│   │   └── ...
+│   ├── compiler/
+│   ├── chat/
+│   ├── version/
+│   ├── github/
+│   ├── ai/
+│   └── notification/
+├── socket/                # Global Socket.IO init, adapters, and middleware
+├── workers/               # BullMQ queue definitions and processor entry points
+├── prisma/                # Schema definitions, migrations, seeders
+└── app.js                 # Express bootstrap and composition root
+```
+
+*Why this structure?* Every feature has everything it needs to function (routes, services, DB access, DTOs). If the `compiler` module becomes too heavy, the entire `modules/compiler` folder can easily be moved into its own microservice repository.
+
+## 4. Core Modules
+
+### Auth Module
+- **Purpose**: Manage authentication and authorization.
+- **Responsibilities**: JWT issuing/verification, Refresh token rotation, Google OAuth flow.
+- **Tables**: `Users`, `RefreshTokens`.
+- **Public APIs**: `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `GET /auth/google`.
+
+### User Module
+- **Purpose**: Manage user profiles and preferences.
+- **Responsibilities**: Profile CRUD, user settings (editor themes, keybindings).
+- **Tables**: `Users`.
+- **Public APIs**: `GET /users/me`, `PATCH /users/me`.
+
+### Room Module
+- **Purpose**: Manage collaborative workspaces.
+- **Responsibilities**: Room creation, managing access permissions, generating invite links.
+- **Tables**: `Rooms`, `RoomMembers`, `Invitations`.
+- **Public APIs**: `POST /rooms`, `GET /rooms/:id`, `POST /rooms/:id/join`.
+- **Socket Events**: `room:join`, `room:leave`.
+
+### Editor Module
+- **Purpose**: Handle real-time collaborative typing.
+- **Responsibilities**: Operational Transformation (OT) or CRDT sync, file tree management, cursor tracking.
+- **Tables**: `Files`.
+- **Socket Events**: `editor:sync`, `cursor:move`, `file:create`, `file:update`.
+- **Redis**: Caches current document state for fast reconnects.
+
+### Socket Module
+- **Purpose**: Infrastructure for real-time connections.
+- **Responsibilities**: Connection management, heartbeat, authentication bridging.
+
+### Chat Module
+- **Purpose**: In-room communication.
+- **Responsibilities**: Sending/receiving messages, historical message retrieval.
+- **Tables**: `Messages`.
+- **Socket Events**: `chat:send`, `chat:receive`.
+
+### Compiler Module
+- **Purpose**: Code execution.
+- **Responsibilities**: Dispatch code to execution environments, stream stdout/stderr back to clients.
+- **Tables**: `CompilerJobs`.
+- **Background Jobs**: Send code to isolate, wait for result.
+- **Socket Events**: `compiler:run`, `compiler:output`.
+
+### Version Module
+- **Purpose**: File history and snapshots.
+- **Responsibilities**: Saving snapshots, diff generation, restoring old versions.
+- **Tables**: `Versions`.
+- **Public APIs**: `GET /rooms/:id/versions`, `POST /rooms/:id/versions/restore`.
+
+### GitHub Module
+- **Purpose**: Repository integration.
+- **Responsibilities**: Cloning repos into rooms, committing changes, PR creation.
+- **Background Jobs**: Async cloning/pushing to avoid blocking.
+
+### AI Module
+- **Purpose**: AI code review and generation.
+- **Responsibilities**: Prompt generation, interfacing with OpenAI/Anthropic APIs.
+- **Background Jobs**: Deep code review processing.
+
+### Notification Module
+- **Purpose**: System alerts.
+- **Responsibilities**: In-app notifications for invites, AI review completion.
+- **Tables**: `Notifications`.
+- **Socket Events**: `notification:new`.
+
+### Worker Module
+- **Purpose**: Infrastructure for BullMQ.
+- **Responsibilities**: Queue initialization, graceful shutdown of workers.
+
+## 5. Request Flow (Sequence Diagrams)
+
+### User Login (Google OAuth)
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant OAuth as Google OAuth
+    participant DB
+    
+    Client->>API: GET /auth/google
+    API->>OAuth: Redirect to Google Consent
+    OAuth-->>API: Callback with Auth Code
+    API->>OAuth: Exchange Code for Profile
+    OAuth-->>API: User Profile
+    API->>DB: Upsert User
+    API->>DB: Store Refresh Token
+    API-->>Client: Return JWT Access & Refresh Token
+```
+
+### Create Room
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant RoomService
+    participant DB
+    
+    Client->>API: POST /rooms { name }
+    API->>RoomService: createRoom(userId, name)
+    RoomService->>DB: Insert Room
+    RoomService->>DB: Insert RoomMember (Role: Admin)
+    RoomService-->>API: Room Details
+    API-->>Client: Return 201 Created
+```
+
+### Join Room
+```mermaid
+sequenceDiagram
+    participant Client
+    participant SocketServer
+    participant RoomService
+    participant Redis
+    
+    Client->>SocketServer: emit('room:join', { roomId })
+    SocketServer->>RoomService: checkPermissions(userId, roomId)
+    RoomService-->>SocketServer: Allowed
+    SocketServer->>Redis: Add userId to Presence
+    SocketServer->>Redis: Publish 'user:joined'
+    SocketServer-->>Client: emit('room:state', { files, users })
+```
+
+### Real-Time Code Editing (CRDT / Sync)
+```mermaid
+sequenceDiagram
+    participant UserA
+    participant UserB
+    participant SocketServer
+    participant Redis
+    
+    UserA->>SocketServer: emit('editor:change', { changes })
+    SocketServer->>Redis: Update ephemeral document state
+    SocketServer->>Redis: PubSub publish to other nodes
+    SocketServer-->>UserB: emit('editor:update', { changes })
+    SocketServer-->>UserA: emit('editor:ack')
+```
+
+### Compile Code
+```mermaid
+sequenceDiagram
+    participant Client
+    participant SocketServer
+    participant Redis
+    participant BullMQ
+    participant Worker
+    participant CompilerEnv as Remote Compiler
+    
+    Client->>SocketServer: emit('compiler:run', { code, lang })
+    SocketServer->>BullMQ: Enqueue Compiler Job
+    SocketServer-->>Client: emit('compiler:queued', { jobId })
+    BullMQ->>Worker: Process Job
+    Worker->>CompilerEnv: Execute Code
+    CompilerEnv-->>Worker: Stream Stdout/Stderr
+    Worker->>Redis: Publish Output
+    Redis->>SocketServer: Broadcast via PubSub
+    SocketServer-->>Client: emit('compiler:output', { stream })
+    Worker->>BullMQ: Job Complete
+```
+
+### Save Version
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant VersionService
+    participant DB
+    
+    Client->>API: POST /rooms/:id/versions
+    API->>VersionService: createSnapshot(roomId)
+    VersionService->>DB: Select current files
+    VersionService->>DB: Insert into Versions
+    VersionService-->>API: Version Info
+    API-->>Client: 201 Created
+```
+
+### GitHub Import
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Worker
+    participant GitHub
+    
+    Client->>API: POST /rooms/:id/github/import { repoUrl }
+    API->>Worker: Enqueue Import Job
+    API-->>Client: 202 Accepted
+    Worker->>GitHub: Clone Repo
+    Worker->>Worker: Parse Files
+    Worker->>DB: Insert Files to Room
+    Worker->>Redis: Publish 'import:complete'
+    Redis->>SocketServer: Broadcast event
+    SocketServer-->>Client: emit('github:imported')
+```
+
+### AI Review
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant Worker
+    participant OpenAI
+    
+    Client->>API: POST /ai/review { fileId }
+    API->>Worker: Enqueue AI Job
+    API-->>Client: 202 Accepted
+    Worker->>DB: Fetch file content
+    Worker->>OpenAI: Request Review Analysis
+    OpenAI-->>Worker: Stream Response
+    Worker->>DB: Save Review Comments
+    Worker->>Redis: Publish 'review:complete'
+    Redis->>SocketServer: Broadcast
+    SocketServer-->>Client: emit('ai:reviewed', { comments })
+```
+
+## 6. Database Architecture (Prisma Models Concept)
+
+> [!TIP]
+> This represents the domain relationships. Prisma schema will implement these strictly using foreign keys and cascading deletes where appropriate.
+
+- **Users**: Core identity. (Has Many: `Rooms` as owner, `RoomMembers`, `Messages`, `Notifications`).
+- **Rooms**: A collaborative workspace/project. (Belongs To: `User` owner. Has Many: `RoomMembers`, `Files`, `Messages`, `Versions`, `CompilerJobs`).
+- **RoomMembers**: Junction table for Room Access Control (Role: Viewer, Editor, Admin).
+- **Files**: Represents code files within a Room. (Belongs To: `Room`).
+- **Versions**: Snapshots of `Files` or entire `Rooms` for history.
+- **Messages**: Chat history within a `Room`.
+- **Invitations**: Pending invites with tokens.
+- **Notifications**: User alerts.
+- **RefreshTokens**: Secure session management.
+- **CompilerJobs**: Audit log of executions.
+
+## 7. Redis Architecture
+
+Redis is a critical infrastructural component, utilized for:
+
+1. **Pub/Sub (Socket.IO Adapter)**: Allows Socket.IO to scale horizontally. An event emitted on API Node A is broadcasted to users connected to API Node B.
+2. **Presence & Socket Sessions**: Tracks which users are currently online and in which rooms (`SET presence:room:{id}:{userId} socketId EX 3600`).
+3. **Session Cache / Ephemeral State**: In-memory storage of the real-time code document to prevent hammering PostgreSQL on every keystroke. 
+4. **BullMQ Backing**: Stores all queues, jobs, and states for the worker layer.
+5. **Rate Limiting**: IP and User-based rate limiting to prevent abuse, especially on AI and Compiler endpoints.
+6. **Temporary Compiler Output**: Buffering compiler streams before delivering to clients.
+
+## 8. Worker Architecture
+
+> [!IMPORTANT]
+> Express is strictly single-threaded. CPU-heavy tasks or long-running network requests MUST NEVER execute within the API layer to prevent blocking the Event Loop.
+
+A dedicated **Worker Service** (running as a separate Node process/Docker container) utilizes BullMQ to process:
+- **Compilation**: Dispatching code to sandboxes.
+- **AI Reviews**: Streaming large context windows to LLMs and parsing responses.
+- **GitHub Sync**: Git cloning, diffing, and pushing.
+- **Email Notifications**: Processing template rendering and sending SMTP emails.
+- **Scheduled Cleanup**: Sweeping expired refresh tokens, old ephemeral Redis data, and orphaned compiler jobs via cron.
+
+## 9. Socket.IO Architecture
+
+Socket connections are divided into isolated **Namespaces** to maintain security and separation of concerns.
+
+### Namespaces
+- `/rooms`: For managing entering/leaving projects.
+- `/editor`: High-frequency real-time typing events, cursors, selections.
+- `/chat`: Text communication.
+- `/compiler`: Execution streaming.
+- `/presence`: Online status of friends/collaborators.
+- `/notifications`: General system alerts and AI review completion events.
+
+### Standards
+- **Authentication**: Socket connections require a JWT in the handshake auth payload.
+- **Acknowledgements**: All client-emitted events expecting a result use Socket.IO ACKs (e.g., `callback({ success: true, data: ... })`).
+- **Error Handling**: Standardized error event `error:system` for socket failures.
+- **Reconnect Strategy**: Client handles reconnect. Server restores state from Redis.
+
+## 10. Security Architecture
+
+- **Authentication**: Short-lived JWTs (15m) and HTTP-only, secure, SameSite `RefreshToken` cookies (7d).
+- **Role-Based Access (RBAC)**: Middleware checks `RoomMembers` permissions (Read vs. Write vs. Admin) before allowing file mutations or socket edits.
+- **Helmet**: Standard security headers (HSTS, NoSniff, XSS Protection).
+- **Rate Limiting**: Strict limits on `/auth`, `/ai`, and `/compiler` via Redis.
+- **Input Validation**: `Zod` strict schema validation for every incoming HTTP payload and Socket event.
+- **Password Hashing**: bcrypt / Argon2 for local accounts (if any).
+- **CORS**: Strictly locked down to the frontend domain.
+- **Secure Cookies**: HTTP Only, Secure, SameSite.
+- **Replay Protection**: Nonces or idempotency keys on sensitive actions (e.g., triggering a GitHub commit).
+
+## 11. Logging Strategy (Pino)
+
+Structured JSON logging ensures logs are queryable in Datadog/Kibana.
+- **Request Logs**: Method, URL, status code, response time.
+- **Socket Logs**: Connection, disconnection, room joins.
+- **Worker Logs**: Job start, completion, failure with stack traces.
+- **Compiler Logs**: Execution times, sandbox creation events.
+- **Error Logs**: Uncaught exceptions, DB connection failures.
+- **Audit Logs**: Security events (login failures, permission changes, GitHub tokens added).
+
+## 12. Error Handling Strategy
+
+Centralized error handling guarantees consistent JSON structures across the entire API.
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "message": "Invalid input provided.",
+    "details": [ { "field": "email", "message": "Must be a valid email" } ]
+  }
+}
+```
+- Core error classes: `AppError`, `ValidationError`, `AuthError`, `NotFoundError`, `ForbiddenError`.
+- Express Global Error Middleware catches all thrown errors and maps them to HTTP status codes.
+
+## 13. Configuration Architecture
+
+Environment variables are validated on boot using Zod. The app will immediately crash if a required secret is missing.
+- **Environment Variables**: Managed via `.env` and loaded using `dotenv`.
+- **Validation**: Schema-based validation via Zod in `config.js`.
+- **Secrets**: Includes DB credentials, JWT secret, AI API keys, Google OAuth keys.
+- **Application Constants**: Rate limit thresholds, pagination limits, queue names.
+- **Feature Flags**: Easily enable/disable AI or Compiler modules during deployment.
+
+## 14. Development Roadmap
+
+### Milestone 1: Project Foundation
+- **Objectives**: Initialize Express, Prisma, Redis, Pino, Zod, and global error handlers. Folder structure setup.
+- **Files to create**: `app.js`, `core/`, `config/`, Prisma init.
+- **Dependencies**: `express`, `prisma`, `pg`, `ioredis`, `zod`, `pino`.
+- **Expected APIs**: `GET /health`
+- **Definition of Done**: API responds to health checks, DB migrations run, Redis connects.
+
+### Milestone 2: Authentication
+- **Objectives**: User models, JWT logic, Refresh Tokens, Google OAuth.
+- **Files**: `modules/auth/`, `modules/user/`.
+- **Expected APIs**: `/auth/login`, `/auth/refresh`, `/auth/google`.
+- **Definition of Done**: User can login, get JWT, refresh session, and logout securely.
+
+### Milestone 3: Room Management
+- **Objectives**: Create rooms, invite users, RBAC logic.
+- **Files**: `modules/room/`.
+- **Expected APIs**: `/rooms`, `/rooms/:id`, `/rooms/:id/join`.
+- **Definition of Done**: User can create a workspace and generate join links.
+
+### Milestone 4: Socket Infrastructure
+- **Objectives**: Setup Socket.IO with Redis Adapter, socket auth middleware.
+- **Files**: `socket/`.
+- **Expected Socket Events**: Socket auth and namespacing.
+- **Definition of Done**: Clients can connect, authenticate, and join room namespaces.
+
+### Milestone 5: Editor Service
+- **Objectives**: Real-time sync, cursor presence, file tree CRUD.
+- **Files**: `modules/editor/`.
+- **Expected Socket Events**: `editor:change`, `cursor:move`.
+- **Definition of Done**: Two users can type simultaneously in a room.
+
+### Milestone 6: Compiler
+- **Objectives**: BullMQ integration, worker setup, execution streaming.
+- **Files**: `modules/compiler/`, `workers/`.
+- **Dependencies**: `bullmq`.
+- **Expected Socket Events**: `compiler:run`, `compiler:output`.
+- **Definition of Done**: Code runs in background and streams output via sockets.
+
+### Milestone 7: Version History
+- **Objectives**: Snapshot logic, restoring files.
+- **Files**: `modules/version/`.
+- **Expected APIs**: `/rooms/:id/versions`.
+- **Definition of Done**: User can view history and rollback a file.
+
+### Milestone 8: GitHub
+- **Objectives**: OAuth for GitHub, repo cloning, committing.
+- **Files**: `modules/github/`.
+- **Expected APIs**: `/rooms/:id/github`.
+- **Definition of Done**: User can import a repo and commit changes back.
+
+### Milestone 9: AI
+- **Objectives**: Prompt engineering, OpenAI integration via workers.
+- **Files**: `modules/ai/`.
+- **Expected APIs/Events**: `/ai/review`.
+- **Definition of Done**: User receives AI code reviews asynchronously.
+
+### Milestone 10: Production Readiness
+- **Objectives**: Dockerization, CI/CD Actions, Sentry integration, Swagger Docs.
+- **Files**: `Dockerfile`, `.github/workflows/`, `swagger.yaml`.
+- **Definition of Done**: Code deploys via CI/CD, tests pass, docs available.
+
+## 15. Important Constraints
+
+- **Do NOT overengineer**: Stick to clean, simple abstraction interfaces.
+- **SOLID & Clean Architecture**: Logic in services, infrastructure in repositories. Dependency injection used where testing necessitates mocking.
+- **Scalability**: All state is in PG or Redis. Express nodes are 100% stateless.
+- **Microservice Readiness**: Feature-based folders ensure that tearing out the Compiler or AI engine into a separate repo later requires moving a single folder, not rewriting the app.
+- **Avoid circular dependencies**: Use dependency injection or emit domain events instead of tightly coupling cross-domain services.

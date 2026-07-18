@@ -1,0 +1,44 @@
+// This is your Prisma schema file.
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Milestone 1: Foundation — Users table only
+// Additional tables will be added in subsequent milestones.
+// ═══════════════════════════════════════════════════════════════
+
+/// Enumeration of supported authentication providers.
+enum AuthProvider {
+  google
+  github
+  local
+}
+
+/// Core user identity table.
+/// Every entity in the system relates back to a user.
+model User {
+  id           String       @id @default(uuid()) @db.Uuid
+  email        String       @unique @db.VarChar(255)
+  name         String       @db.VarChar(100)
+  avatarUrl    String?      @map("avatar_url") @db.Text
+  preferences  Json         @default("{}") @db.JsonB
+  authProvider AuthProvider @map("auth_provider")
+  googleId     String?      @unique @map("google_id") @db.VarChar(255)
+  passwordHash String?      @map("password_hash") @db.VarChar(255)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt    DateTime?    @map("deleted_at") @db.Timestamptz()
+
+  // Indexes for common query patterns
+  @@index([name], name: "idx_users_name")
+  @@index([deletedAt], name: "idx_users_deleted_at")
+  @@map("users")
+}

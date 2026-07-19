@@ -71,7 +71,7 @@ async function start() {
         port: config.PORT,
         env: config.NODE_ENV,
         nodeVersion: process.version,
-      }, `🚀 Server running on port ${config.PORT} (${config.NODE_ENV})`);
+      }, `Server running on port ${config.PORT} (${config.NODE_ENV})`);
     });
   } catch (err) {
     logger.fatal({ err }, 'Failed to start server');

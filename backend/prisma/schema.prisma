@@ -22,6 +22,21 @@ enum AuthProvider {
   local
 }
 
+/// Role-based access control levels within a room.
+enum Role {
+  viewer
+  editor
+  admin
+}
+
+/// State of an invitation to join a room.
+enum InvitationStatus {
+  pending
+  accepted
+  expired
+  revoked
+}
+
 /// Core user identity table.
 /// Every entity in the system relates back to a user.
 model User {
@@ -38,7 +53,10 @@ model User {
   deletedAt    DateTime?    @map("deleted_at") @db.Timestamptz()
 
   // Relations
-  refreshTokens RefreshToken[]
+  refreshTokens    RefreshToken[]
+  ownedRooms       Room[]         @relation("RoomOwner")
+  roomMemberships  RoomMember[]
+  sentInvitations  Invitation[]   @relation("InvitationSender")
 
   // Indexes for common query patterns
   @@index([name], name: "idx_users_name")
@@ -70,3 +88,70 @@ model RefreshToken {
   @@index([expiresAt], name: "idx_refresh_tokens_expires")
   @@map("refresh_tokens")
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Milestone 3: Room Management & RBAC
+// ═══════════════════════════════════════════════════════════════
+
+/// Collaborative room containing code files and chat.
+model Room {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @db.VarChar(100)
+  description String?   @db.Text
+  language    String    @default("javascript") @db.VarChar(50)
+  ownerId     String    @map("owner_id") @db.Uuid
+  isPublic    Boolean   @default(false) @map("is_public")
+  settings    Json      @default("{}") @db.JsonB
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz()
+
+  // Relations
+  owner       User         @relation("RoomOwner", fields: [ownerId], references: [id])
+  members     RoomMember[]
+  invitations Invitation[]
+
+  @@index([ownerId], name: "idx_rooms_owner_id")
+  @@index([createdAt(sort: Desc)], name: "idx_rooms_created_at")
+  @@index([deletedAt], name: "idx_rooms_deleted_at")
+  @@map("rooms")
+}
+
+/// Many-to-many junction table for Room Memberships.
+model RoomMember {
+  id        String   @id @default(uuid()) @db.Uuid
+  roomId    String   @map("room_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  role      Role     @default(editor)
+  joinedAt  DateTime @default(now()) @map("joined_at") @db.Timestamptz()
+
+  // Relations
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Composite unique constraint: A user can only be a member of a room once
+  @@unique([roomId, userId], map: "idx_room_members_room_user")
+  @@index([userId], name: "idx_room_members_user_id")
+  @@map("room_members")
+}
+
+/// Secure invitations to join a room.
+model Invitation {
+  id        String           @id @default(uuid()) @db.Uuid
+  roomId    String           @map("room_id") @db.Uuid
+  invitedBy String           @map("invited_by") @db.Uuid
+  token     String           @unique @db.VarChar(64)
+  role      Role             @default(editor)
+  status    InvitationStatus @default(pending)
+  expiresAt DateTime         @map("expires_at") @db.Timestamptz()
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  room      Room             @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  inviter   User             @relation("InvitationSender", fields: [invitedBy], references: [id])
+
+  @@index([roomId], name: "idx_invitations_room")
+  @@index([expiresAt], name: "idx_invitations_expires")
+  @@map("invitations")
+}
+

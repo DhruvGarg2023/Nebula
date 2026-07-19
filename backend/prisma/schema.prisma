@@ -37,8 +37,36 @@ model User {
   updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz()
   deletedAt    DateTime?    @map("deleted_at") @db.Timestamptz()
 
+  // Relations
+  refreshTokens RefreshToken[]
+
   // Indexes for common query patterns
   @@index([name], name: "idx_users_name")
   @@index([deletedAt], name: "idx_users_deleted_at")
   @@map("users")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Milestone 2: Authentication — RefreshTokens table
+// ═══════════════════════════════════════════════════════════════
+
+/// Stores hashed refresh tokens for JWT rotation.
+/// Never stores raw tokens — only SHA-256 hashes.
+/// Supports reuse detection: if a revoked token is reused,
+/// all user tokens are revoked (indicates token theft).
+model RefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  tokenHash String   @unique @map("token_hash") @db.VarChar(255)
+  userAgent String?  @map("user_agent") @db.Text
+  ipAddress String?  @map("ip_address") @db.VarChar(45)
+  isRevoked Boolean  @default(false) @map("is_revoked")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], name: "idx_refresh_tokens_user")
+  @@index([expiresAt], name: "idx_refresh_tokens_expires")
+  @@map("refresh_tokens")
 }

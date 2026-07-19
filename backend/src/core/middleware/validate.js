@@ -32,8 +32,13 @@ function validate(schema, source = 'body') {
       throw new ValidationError('Invalid input provided.', details);
     }
 
-    // Replace the source with the parsed (and potentially transformed/defaulted) data
-    req[source] = result.data;
+    // Express 5 defines req.query as a getter. We use Object.defineProperty to override it.
+    Object.defineProperty(req, source, {
+      value: result.data,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
     next();
   };
 }

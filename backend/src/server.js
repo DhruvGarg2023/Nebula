@@ -5,28 +5,11 @@ import { connectRedis, disconnectRedis } from './core/redis/client.js';
 import { disconnectDatabase } from './core/database/prisma.js';
 import createApp from './app.js';
 
-/**
- * Server entry point.
- *
- * Responsibilities:
- * 1. Create the Express application
- * 2. Create the HTTP server (needed for future Socket.IO attachment)
- * 3. Connect to Redis
- * 4. Start listening on the configured port
- * 5. Handle graceful shutdown
- *
- * The HTTP server is created separately from Express because Socket.IO
- * (Milestone 4) will need to attach to the raw HTTP server, not the
- * Express app.
- */
+
 const app = createApp();
 const server = http.createServer(app);
 
-/**
- * Graceful shutdown handler.
- * Ensures all connections are closed cleanly before the process exits.
- * Important for zero-downtime deployments (rolling updates).
- */
+
 async function gracefulShutdown(signal) {
   logger.info({ signal }, `${signal} received. Starting graceful shutdown...`);
 

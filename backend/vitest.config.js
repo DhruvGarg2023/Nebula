@@ -17,6 +17,7 @@ export default defineConfig({
     // Run tests in sequence for integration tests (shared DB)
     // Unit tests are parallelized by default
     pool: 'forks',
+    fileParallelism: false,
 
     // Coverage configuration
     coverage: {

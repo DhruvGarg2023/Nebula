@@ -4,6 +4,8 @@ import logger from './core/logger/index.js';
 import { connectRedis, disconnectRedis } from './core/redis/client.js';
 import { disconnectDatabase } from './core/database/prisma.js';
 import createApp from './app.js';
+import { initSockets } from './core/sockets/index.js';
+import { registerCollaborationNamespace } from './modules/collaboration/sockets.js';
 
 
 const app = createApp();
@@ -64,6 +66,11 @@ async function start() {
     // Connect to Redis
     await connectRedis();
     logger.info('Redis connected successfully');
+
+    // Initialize WebSockets
+    initSockets(server);
+    registerCollaborationNamespace();
+    logger.info('WebSocket namespaces registered');
 
     // Start HTTP server
     server.listen(config.PORT, () => {

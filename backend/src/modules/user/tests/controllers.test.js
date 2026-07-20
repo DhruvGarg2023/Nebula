@@ -54,10 +54,10 @@ describe('User API Integration', () => {
       const res = await request(app)
         .patch('/api/v1/users/me')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ name: 'Updated Name', preferences: { theme: 'dark' } });
+        .send({ name: 'UniqueNameTest', preferences: { theme: 'dark' } });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.name).toBe('Updated Name');
+      expect(res.body.data.name).toBe('UniqueNameTest');
       expect(res.body.data.preferences).toEqual({ theme: 'dark' });
     });
 
@@ -74,13 +74,13 @@ describe('User API Integration', () => {
   describe('GET /api/v1/users/search', () => {
     it('should find users by name', async () => {
       const res = await request(app)
-        .get('/api/v1/users/search?q=Updated')
+        .get('/api/v1/users/search?q=UniqueNameTest')
         .set('Authorization', `Bearer ${accessToken}`);
 
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body.data)).toBe(true);
       expect(res.body.data.length).toBeGreaterThan(0);
-      expect(res.body.data[0].name).toBe('Updated Name');
+      expect(res.body.data[0].name).toBe('UniqueNameTest');
     });
   });
 

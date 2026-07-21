@@ -6,7 +6,7 @@ import { disconnectDatabase } from './core/database/prisma.js';
 import createApp from './app.js';
 import { initSockets } from './core/sockets/index.js';
 import { registerCollaborationNamespace } from './modules/collaboration/sockets.js';
-
+import { registerEditorNamespace } from './modules/editor/sockets.js';
 
 const app = createApp();
 const server = http.createServer(app);
@@ -70,6 +70,7 @@ async function start() {
     // Initialize WebSockets
     initSockets(server);
     registerCollaborationNamespace();
+    registerEditorNamespace();
     logger.info('WebSocket namespaces registered');
 
     // Start HTTP server

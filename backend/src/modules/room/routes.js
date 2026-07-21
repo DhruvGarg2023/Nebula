@@ -13,6 +13,10 @@ import {
 } from './dto.js';
 
 const router = Router();
+import fileRoutes from '../file/routes.js';
+
+// ── File Routes ──────────────────────────────────────────────────
+router.use('/:roomId/files', fileRoutes);
 
 // ── Public / Unauthenticated Routes ──────────────────────────────
 // Check invitation details (used for rendering the accept invite page)

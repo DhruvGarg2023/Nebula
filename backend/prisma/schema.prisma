@@ -110,6 +110,7 @@ model Room {
   owner       User         @relation("RoomOwner", fields: [ownerId], references: [id])
   members     RoomMember[]
   invitations Invitation[]
+  files       File[]
 
   @@index([ownerId], name: "idx_rooms_owner_id")
   @@index([createdAt(sort: Desc)], name: "idx_rooms_created_at")
@@ -155,3 +156,25 @@ model Invitation {
   @@map("invitations")
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Milestone 5: File Management
+// ═══════════════════════════════════════════════════════════════
+
+/// A code file belonging to a room.
+model File {
+  id        String   @id @default(uuid()) @db.Uuid
+  roomId    String   @map("room_id") @db.Uuid
+  name      String   @db.VarChar(255)
+  language  String   @db.VarChar(50)
+  content   String   @default("") @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  // A room cannot have two files with the exact same name
+  @@unique([roomId, name], map: "idx_files_room_name")
+  @@index([roomId], name: "idx_files_room_id")
+  @@map("files")
+}

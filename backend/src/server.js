@@ -7,6 +7,7 @@ import createApp from './app.js';
 import { initSockets } from './core/sockets/index.js';
 import { registerCollaborationNamespace } from './modules/collaboration/sockets.js';
 import { registerEditorNamespace } from './modules/editor/sockets.js';
+import { registerChatNamespace } from './modules/chat/sockets.js';
 
 const app = createApp();
 const server = http.createServer(app);
@@ -71,6 +72,7 @@ async function start() {
     initSockets(server);
     registerCollaborationNamespace();
     registerEditorNamespace();
+    registerChatNamespace();
     logger.info('WebSocket namespaces registered');
 
     // Start HTTP server

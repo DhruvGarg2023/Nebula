@@ -57,6 +57,7 @@ model User {
   ownedRooms       Room[]         @relation("RoomOwner")
   roomMemberships  RoomMember[]
   sentInvitations  Invitation[]   @relation("InvitationSender")
+  messages         Message[]
 
   // Indexes for common query patterns
   @@index([name], name: "idx_users_name")
@@ -111,6 +112,7 @@ model Room {
   members     RoomMember[]
   invitations Invitation[]
   files       File[]
+  messages    Message[]
 
   @@index([ownerId], name: "idx_rooms_owner_id")
   @@index([createdAt(sort: Desc)], name: "idx_rooms_created_at")
@@ -177,4 +179,31 @@ model File {
   @@unique([roomId, name], map: "idx_files_room_name")
   @@index([roomId], name: "idx_files_room_id")
   @@map("files")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Milestone 6: Chat System
+// ═══════════════════════════════════════════════════════════════
+
+/// Type of chat message.
+enum MessageType {
+  USER
+  SYSTEM
+}
+
+/// A chat message within a room.
+model Message {
+  id        String      @id @default(uuid()) @db.Uuid
+  roomId    String      @map("room_id") @db.Uuid
+  userId    String?     @map("user_id") @db.Uuid
+  content   String      @db.Text
+  type      MessageType @default(USER)
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  room Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([roomId, createdAt(sort: Desc)], name: "idx_messages_room_created_at")
+  @@map("messages")
 }

@@ -4,6 +4,7 @@ import { SocketError } from '../../core/errors/SocketError.js';
 import logger from '../../core/logger/index.js';
 import * as collabService from './services.js';
 import * as roomRepo from '../room/repositories.js';
+import { sendSystemMessage } from '../chat/sockets.js';
 
 export function registerCollaborationNamespace() {
   const io = getIO();
@@ -57,6 +58,9 @@ export function registerCollaborationNamespace() {
           timestamp: Date.now()
         });
 
+        // Send system message to chat
+        await sendSystemMessage(roomId, `${socket.user.name} joined the room`);
+
         // Send back current presence list to the joining user
         const currentPresence = await collabService.getRoomPresence(roomId);
 
@@ -90,6 +94,8 @@ export function registerCollaborationNamespace() {
           userId: socket.user.id,
           timestamp: Date.now()
         });
+
+        await sendSystemMessage(roomId, `${socket.user.name} left the room`);
 
         logger.debug({ roomId, userId: socket.user.id }, 'User left room presence');
 

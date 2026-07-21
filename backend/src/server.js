@@ -8,6 +8,8 @@ import { initSockets } from './core/sockets/index.js';
 import { registerCollaborationNamespace } from './modules/collaboration/sockets.js';
 import { registerEditorNamespace } from './modules/editor/sockets.js';
 import { registerChatNamespace } from './modules/chat/sockets.js';
+import { registerCompilerNamespace } from './modules/compiler/sockets.js';
+import { initCompilerWorker } from './modules/compiler/worker.js';
 
 const app = createApp();
 const server = http.createServer(app);
@@ -73,7 +75,11 @@ async function start() {
     registerCollaborationNamespace();
     registerEditorNamespace();
     registerChatNamespace();
+    registerCompilerNamespace();
     logger.info('WebSocket namespaces registered');
+
+    // Initialize BullMQ compiler worker
+    initCompilerWorker();
 
     // Start HTTP server
     server.listen(config.PORT, () => {

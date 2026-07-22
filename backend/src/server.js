@@ -61,9 +61,7 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-/**
- * Start the server.
- */
+
 async function start() {
   try {
     // Connect to Redis

@@ -17,12 +17,14 @@ import fileRoutes from '../file/routes.js';
 import chatRoutes from '../chat/routes.js';
 import compilerRoutes from '../compiler/routes.js';
 import versionRoutes from '../version/routes.js';
+import { roomGitHubRouter } from '../github/routes.js';
 
 // ── Nested Module Routes ─────────────────────────────────────────
 router.use('/:roomId/files', fileRoutes);
 router.use('/:roomId/messages', chatRoutes);
 router.use('/:roomId/compiler', compilerRoutes);
 router.use('/:roomId/versions', versionRoutes);
+router.use('/:roomId/github', roomGitHubRouter);
 
 // ── Public / Unauthenticated Routes ──────────────────────────────
 // Check invitation details (used for rendering the accept invite page)

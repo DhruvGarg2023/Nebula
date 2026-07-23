@@ -1,37 +1,65 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
 
 /**
- * Cryptographic utility functions for authentication.
- *
- * Design decisions:
- * - Uses Node.js built-in crypto module (zero external dependencies)
- * - SHA-256 for refresh token hashing (one-way, fast, sufficient for token storage)
- * - 256-bit random tokens (32 bytes hex-encoded = 64 chars) for refresh tokens
- *
- * Security rationale:
- * - Refresh tokens are never stored in plaintext — only SHA-256 hashes
- * - If the database is compromised, hashes cannot be reversed to usable tokens
- * - 256-bit randomness provides 2^256 possible tokens (brute-force infeasible)
+ * Cryptographic utility functions for authentication and secret encryption.
  */
 
-/**
- * Hash a token using SHA-256.
- * Used to hash refresh tokens before database storage.
- *
- * @param {string} token - The plaintext token to hash
- * @returns {string} Hex-encoded SHA-256 hash
- */
 export function hashToken(token) {
   return createHash('sha256').update(token).digest('hex');
 }
 
-/**
- * Generate a cryptographically secure random token.
- * Used for refresh tokens and invitation tokens.
- *
- * @param {number} [bytes=32] - Number of random bytes (default: 32 = 256-bit)
- * @returns {string} Hex-encoded random token
- */
 export function generateSecureToken(bytes = 32) {
   return randomBytes(bytes).toString('hex');
 }
+
+/**
+ * Encrypt a plaintext string using AES-256-GCM.
+ * Output format: `ivHex:authTagHex:encryptedDataHex`
+ *
+ * @param {string} text - Plaintext to encrypt
+ * @param {string} secretKey - Secret key (at least 32 bytes or hashed to 32 bytes)
+ * @returns {string} Encrypted token string
+ */
+export function encryptSymmetric(text, secretKey = process.env.ENCRYPTION_KEY || 'default-encryption-key-must-be-32!!') {
+  if (!text) return text;
+  const key = createHash('sha256').update(secretKey).digest(); // Always 32 bytes
+  const iv = randomBytes(12); // 96-bit IV for GCM
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+
+  const authTag = cipher.getAuthTag().toString('hex');
+
+  return `${iv.toString('hex')}:${authTag}:${encrypted}`;
+}
+
+/**
+ * Decrypt an AES-256-GCM encrypted string.
+ *
+ * @param {string} encryptedText - Encrypted token string (`iv:tag:cipher`)
+ * @param {string} secretKey - Secret key used for encryption
+ * @returns {string} Decrypted plaintext
+ */
+export function decryptSymmetric(encryptedText, secretKey = process.env.ENCRYPTION_KEY || 'default-encryption-key-must-be-32!!') {
+  if (!encryptedText) return encryptedText;
+  const parts = encryptedText.split(':');
+  if (parts.length !== 3) {
+    // Return raw text if not in encrypted format (e.g. dev/unencrypted tokens)
+    return encryptedText;
+  }
+
+  const [ivHex, authTagHex, encryptedDataHex] = parts;
+  const key = createHash('sha256').update(secretKey).digest();
+  const iv = Buffer.from(ivHex, 'hex');
+  const authTag = Buffer.from(authTagHex, 'hex');
+
+  const decipher = createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(authTag);
+
+  let decrypted = decipher.update(encryptedDataHex, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+
+  return decrypted;
+}
+

@@ -10,6 +10,7 @@ import systemRoutes from './modules/system/routes.js';
 import authRoutes from './modules/auth/routes.js';
 import userRoutes from './modules/user/routes.js';
 import roomRoutes from './modules/room/routes.js';
+import { userGitHubRouter } from './modules/github/routes.js';
 import cookieParser from 'cookie-parser';
 import passport from 'passport';
 
@@ -51,6 +52,7 @@ function createApp() {
   app.use('/api/v1/auth', authRoutes);
   app.use('/api/v1/users', userRoutes);
   app.use('/api/v1/rooms', roomRoutes);
+  app.use('/api/v1/github', userGitHubRouter);
 
 
   // ── 404 Handler ──────────────────────────────────────────────

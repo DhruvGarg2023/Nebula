@@ -10,6 +10,7 @@ import { registerEditorNamespace } from './modules/editor/sockets.js';
 import { registerChatNamespace } from './modules/chat/sockets.js';
 import { registerCompilerNamespace } from './modules/compiler/sockets.js';
 import { initCompilerWorker } from './modules/compiler/worker.js';
+import { initGitHubWorker } from './modules/github/worker.js';
 
 const app = createApp();
 const server = http.createServer(app);
@@ -76,8 +77,9 @@ async function start() {
     registerCompilerNamespace();
     logger.info('WebSocket namespaces registered');
 
-    // Initialize BullMQ compiler worker
+    // Initialize BullMQ workers
     initCompilerWorker();
+    initGitHubWorker();
 
     // Start HTTP server
     server.listen(config.PORT, () => {

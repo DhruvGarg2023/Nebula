@@ -60,6 +60,7 @@ model User {
   messages         Message[]
   compilerJobs     CompilerJob[]
   createdVersions  Version[]      @relation("CreatedVersions")
+  githubToken      GitHubToken?
 
   // Indexes for common query patterns
   @@index([name], name: "idx_users_name")
@@ -289,4 +290,27 @@ model VersionFile {
   @@index([versionId], name: "idx_version_files_version")
   @@map("version_files")
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Milestone 9: GitHub Integration
+// ═══════════════════════════════════════════════════════════════
+
+/// Encrypted storage for GitHub user connection tokens.
+model GitHubToken {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @unique @map("user_id") @db.Uuid
+  accessToken  String    @map("access_token") @db.Text
+  refreshToken String?   @map("refresh_token") @db.Text
+  username     String    @db.VarChar(100)
+  expiresAt    DateTime? @map("expires_at") @db.Timestamptz()
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], name: "idx_github_tokens_user")
+  @@map("github_tokens")
+}
+
 

@@ -59,6 +59,7 @@ model User {
   sentInvitations  Invitation[]   @relation("InvitationSender")
   messages         Message[]
   compilerJobs     CompilerJob[]
+  createdVersions  Version[]      @relation("CreatedVersions")
 
   // Indexes for common query patterns
   @@index([name], name: "idx_users_name")
@@ -115,6 +116,7 @@ model Room {
   files       File[]
   messages    Message[]
   compilerJobs CompilerJob[]
+  versions     Version[]
 
   @@index([ownerId], name: "idx_rooms_owner_id")
   @@index([createdAt(sort: Desc)], name: "idx_rooms_created_at")
@@ -249,3 +251,42 @@ model CompilerJob {
   @@index([userId, createdAt(sort: Desc)], name: "idx_compiler_jobs_user")
   @@map("compiler_jobs")
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Milestone 8: Version History
+// ═══════════════════════════════════════════════════════════════
+
+/// Version history snapshot metadata.
+model Version {
+  id          String   @id @default(uuid()) @db.Uuid
+  roomId      String   @map("room_id") @db.Uuid
+  createdBy   String   @map("created_by") @db.Uuid
+  label       String?  @db.VarChar(100)
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  room         Room          @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  creator      User          @relation("CreatedVersions", fields: [createdBy], references: [id], onDelete: Cascade)
+  versionFiles VersionFile[]
+
+  @@index([roomId, createdAt(sort: Desc)], name: "idx_versions_room_created")
+  @@map("versions")
+}
+
+/// Immutable file snapshot for a version.
+model VersionFile {
+  id        String  @id @default(uuid()) @db.Uuid
+  versionId String  @map("version_id") @db.Uuid
+  fileName  String  @map("file_name") @db.VarChar(255)
+  filePath  String  @default("/") @map("file_path") @db.VarChar(1000)
+  content   String  @db.Text
+  language  String? @db.VarChar(50)
+
+  // Relations
+  version Version @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@index([versionId], name: "idx_version_files_version")
+  @@map("version_files")
+}
+

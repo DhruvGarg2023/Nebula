@@ -16,11 +16,13 @@ const router = Router();
 import fileRoutes from '../file/routes.js';
 import chatRoutes from '../chat/routes.js';
 import compilerRoutes from '../compiler/routes.js';
+import versionRoutes from '../version/routes.js';
 
 // ── Nested Module Routes ─────────────────────────────────────────
 router.use('/:roomId/files', fileRoutes);
 router.use('/:roomId/messages', chatRoutes);
 router.use('/:roomId/compiler', compilerRoutes);
+router.use('/:roomId/versions', versionRoutes);
 
 // ── Public / Unauthenticated Routes ──────────────────────────────
 // Check invitation details (used for rendering the accept invite page)

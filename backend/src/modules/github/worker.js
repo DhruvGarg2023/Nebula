@@ -3,6 +3,7 @@ import { redisConnectionOptions } from '../../core/queue/index.js';
 import * as githubClient from './githubClient.js';
 import prisma from '../../core/database/prisma.js';
 import * as versionRepository from '../version/repositories.js';
+import { sendNotification } from '../notification/services.js';
 import logger from '../../core/logger/index.js';
 
 export const GITHUB_QUEUE_NAME = 'github-queue';
@@ -122,6 +123,15 @@ async function processImportJob(job) {
     );
   }
 
+  await sendNotification(
+    userId,
+    'github_import_complete',
+    'GitHub Repository Imported',
+    `Successfully imported ${importedFiles.length} file(s) from ${owner}/${repo} (${branch}).`,
+    `/rooms/${roomId}`,
+    { roomId, owner, repo, branch, filesCount: importedFiles.length }
+  ).catch((err) => logger.warn({ err }, 'Failed to send GitHub import completion notification'));
+
   return {
     roomId,
     filesCount: importedFiles.length,
@@ -150,6 +160,15 @@ async function processPushJob(job) {
     message,
     roomFiles
   );
+
+  await sendNotification(
+    userId,
+    'github_push_complete',
+    'GitHub Commit & Push Completed',
+    `Successfully pushed commit '${message}' to ${owner}/${repo} (${branch}).`,
+    `/rooms/${roomId}`,
+    { roomId, owner, repo, branch, commitSha: result.commitSha }
+  ).catch((err) => logger.warn({ err }, 'Failed to send GitHub push completion notification'));
 
   return result;
 }

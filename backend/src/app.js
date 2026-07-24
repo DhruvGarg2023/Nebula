@@ -12,6 +12,7 @@ import userRoutes from './modules/user/routes.js';
 import roomRoutes from './modules/room/routes.js';
 import { userGitHubRouter } from './modules/github/routes.js';
 import { globalAiRouter } from './modules/ai/routes.js';
+import notificationRoutes from './modules/notification/routes.js';
 import cookieParser from 'cookie-parser';
 import passport from 'passport';
 
@@ -55,6 +56,7 @@ function createApp() {
   app.use('/api/v1/rooms', roomRoutes);
   app.use('/api/v1/github', userGitHubRouter);
   app.use('/api/v1/ai', globalAiRouter);
+  app.use('/api/v1/notifications', notificationRoutes);
 
 
   // ── 404 Handler ──────────────────────────────────────────────

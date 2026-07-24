@@ -53,8 +53,10 @@ export function initAiWorker() {
   return aiWorker;
 }
 
+import { sendNotification } from '../notification/services.js';
+
 async function processReviewJob(job) {
-  const { reviewId, sourceCode, language } = job.data;
+  const { reviewId, userId, sourceCode, language } = job.data;
 
   // 1. Update review status to running
   await aiRepository.updateAiReviewStatus(reviewId, 'running');
@@ -68,7 +70,7 @@ async function processReviewJob(job) {
     const parsed = parseReviewResponse(rawResult);
 
     // 4. Save completed audit record to database
-    return aiRepository.updateAiReviewStatus(
+    const updatedReview = await aiRepository.updateAiReviewStatus(
       reviewId,
       'completed',
       parsed.summary,
@@ -76,6 +78,18 @@ async function processReviewJob(job) {
       parsed.suggestions,
       0.002
     );
+
+    // 5. Send notification to user
+    await sendNotification(
+      userId,
+      'ai_review_complete',
+      'AI Code Review Completed',
+      `Your AI code review completed with ${parsed.issues.length} issue(s) identified.`,
+      `/api/v1/ai/reviews/${reviewId}`,
+      { reviewId, issuesCount: parsed.issues.length }
+    ).catch((err) => logger.warn({ err }, 'Failed to send AI review completion notification'));
+
+    return updatedReview;
   } catch (err) {
     logger.error({ reviewId, err }, 'Failed to process AI code review');
     await aiRepository.updateAiReviewStatus(reviewId, 'failed', `Error: ${err.message}`);

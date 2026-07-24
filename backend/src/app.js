@@ -11,6 +11,7 @@ import authRoutes from './modules/auth/routes.js';
 import userRoutes from './modules/user/routes.js';
 import roomRoutes from './modules/room/routes.js';
 import { userGitHubRouter } from './modules/github/routes.js';
+import { globalAiRouter } from './modules/ai/routes.js';
 import cookieParser from 'cookie-parser';
 import passport from 'passport';
 
@@ -27,7 +28,7 @@ function createApp() {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(cookieParser());
-  
+
   // ── Passport Initialization ────────────────────────────────────
   app.use(passport.initialize());
 
@@ -47,12 +48,13 @@ function createApp() {
 
   // System routes (health checks) — no /api/v1 prefix
   app.use('/api/v1', systemRoutes);
-  
+
   // Feature modules
   app.use('/api/v1/auth', authRoutes);
   app.use('/api/v1/users', userRoutes);
   app.use('/api/v1/rooms', roomRoutes);
   app.use('/api/v1/github', userGitHubRouter);
+  app.use('/api/v1/ai', globalAiRouter);
 
 
   // ── 404 Handler ──────────────────────────────────────────────

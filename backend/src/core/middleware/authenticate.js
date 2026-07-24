@@ -21,21 +21,21 @@ import logger from '../logger/index.js';
  * @param {import('express').NextFunction} next
  */
 function authenticate(req, _res, next) {
+  let token = null;
+
   const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new AuthenticationError(
-      'Access token is required. Provide it in the Authorization header as: Bearer <token>',
-      'TOKEN_MISSING'
-    );
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (req.query && req.query.token) {
+    token = req.query.token;
+  } else if (req.cookies && req.cookies.access_token) {
+    token = req.cookies.access_token;
   }
-
-  const token = authHeader.split(' ')[1];
 
   if (!token) {
     throw new AuthenticationError(
-      'Access token is malformed.',
-      'TOKEN_INVALID'
+      'Access token is required. Provide it in the Authorization header as: Bearer <token> or ?token=<token>',
+      'TOKEN_MISSING'
     );
   }
 

@@ -11,6 +11,7 @@ import { registerChatNamespace } from './modules/chat/sockets.js';
 import { registerCompilerNamespace } from './modules/compiler/sockets.js';
 import { initCompilerWorker } from './modules/compiler/worker.js';
 import { initGitHubWorker } from './modules/github/worker.js';
+import { initAiWorker } from './modules/ai/worker.js';
 
 const app = createApp();
 const server = http.createServer(app);
@@ -80,6 +81,7 @@ async function start() {
     // Initialize BullMQ workers
     initCompilerWorker();
     initGitHubWorker();
+    initAiWorker();
 
     // Start HTTP server
     server.listen(config.PORT, () => {

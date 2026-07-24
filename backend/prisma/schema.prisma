@@ -61,6 +61,7 @@ model User {
   compilerJobs     CompilerJob[]
   createdVersions  Version[]      @relation("CreatedVersions")
   githubToken      GitHubToken?
+  aiReviews        AiReview[]
 
   // Indexes for common query patterns
   @@index([name], name: "idx_users_name")
@@ -118,6 +119,7 @@ model Room {
   messages    Message[]
   compilerJobs CompilerJob[]
   versions     Version[]
+  aiReviews    AiReview[]
 
   @@index([ownerId], name: "idx_rooms_owner_id")
   @@index([createdAt(sort: Desc)], name: "idx_rooms_created_at")
@@ -180,6 +182,7 @@ model File {
   // Relations
   room         Room          @relation(fields: [roomId], references: [id], onDelete: Cascade)
   compilerJobs CompilerJob[]
+  aiReviews    AiReview[]
 
   // A room cannot have two files with the exact same name
   @@unique([roomId, name], map: "idx_files_room_name")
@@ -311,6 +314,34 @@ model GitHubToken {
 
   @@index([userId], name: "idx_github_tokens_user")
   @@map("github_tokens")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Milestone 10: AI Code Review & Assistance
+// ═══════════════════════════════════════════════════════════════
+
+/// Asynchronous AI code review audit record and results.
+model AiReview {
+  id          String    @id @default(uuid()) @db.Uuid
+  roomId      String    @map("room_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  fileId      String?   @map("file_id") @db.Uuid
+  status      String    @default("queued") @db.VarChar(20)
+  summary     String?   @db.Text
+  issues      Json      @default("[]") @db.JsonB
+  suggestions Json      @default("[]") @db.JsonB
+  costUsd     Float     @default(0.0) @map("cost_usd")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  completedAt DateTime? @map("completed_at") @db.Timestamptz()
+
+  // Relations
+  room Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  file File? @relation(fields: [fileId], references: [id], onDelete: SetNull)
+
+  @@index([roomId, createdAt(sort: Desc)], name: "idx_ai_reviews_room")
+  @@index([userId, createdAt(sort: Desc)], name: "idx_ai_reviews_user")
+  @@map("ai_reviews")
 }
 
 

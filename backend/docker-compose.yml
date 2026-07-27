@@ -8,6 +8,8 @@ services:
     restart: unless-stopped
     ports:
       - '3000:3000'
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -15,6 +17,9 @@ services:
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET=production-super-secret-jwt-key-must-be-32-chars!!
       - ENCRYPTION_KEY=production-encryption-key-must-be-32-chars!!
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-dev-google-client-id-placeholder}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-dev-google-client-secret-placeholder}
+      - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL:-http://localhost:3000/api/v1/auth/google/callback}
       - CORS_ORIGIN=http://localhost:5173
     depends_on:
       postgres:

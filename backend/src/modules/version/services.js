@@ -43,7 +43,7 @@ export async function getVersionDetails(roomId, versionId) {
 export async function computeVersionDiff(roomId, baseVersionId, targetVersionId = null) {
   const baseVersion = await getVersionDetails(roomId, baseVersionId);
 
-  let targetFiles = [];
+  let targetFiles;
   let targetLabel = 'Current State';
 
   if (targetVersionId) {

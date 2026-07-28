@@ -1,7 +1,7 @@
 import * as githubRepository from './repositories.js';
 import * as githubClient from './githubClient.js';
 import { getGitHubQueue } from './worker.js';
-import { ForbiddenError, NotFoundError, ConflictError } from '../../core/errors/AppError.js';
+import { ForbiddenError, ConflictError } from '../../core/errors/AppError.js';
 import { getRedisClient } from '../../core/redis/client.js';
 import logger from '../../core/logger/index.js';
 

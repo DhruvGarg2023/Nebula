@@ -29,6 +29,7 @@ describe('Room API Integration & RBAC', () => {
     const editorRes = await request(app).post('/api/v1/auth/dev/login').send({ email: 'editor@example.com', name: 'Editor' });
     editorToken = editorRes.body.data.accessToken;
     editorId = editorRes.body.data.user.id;
+    expect(editorId).toBeDefined();
 
     const viewerRes = await request(app).post('/api/v1/auth/dev/login').send({ email: 'viewer@example.com', name: 'Viewer' });
     viewerToken = viewerRes.body.data.accessToken;

@@ -1,4 +1,3 @@
-import logger from '../../../core/logger/index.js';
 import { AppError } from '../../../core/errors/AppError.js';
 import config from '../../../config/index.js';
 

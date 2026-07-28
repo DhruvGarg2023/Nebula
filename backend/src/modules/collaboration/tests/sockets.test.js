@@ -4,7 +4,6 @@ import { Server } from 'socket.io';
 import { io as Client } from 'socket.io-client';
 import jwt from 'jsonwebtoken';
 import config from '../../../config/index.js';
-import { initSockets } from '../../../core/sockets/index.js';
 import { registerCollaborationNamespace } from '../sockets.js';
 import * as collabService from '../services.js';
 import * as roomRepo from '../../room/repositories.js';
@@ -39,7 +38,7 @@ vi.mock('../services.js', () => ({
 }));
 
 describe('Collaboration Socket Namespace', () => {
-  let io, serverSocket, clientSocket;
+  let io;
   let port;
 
   beforeAll(async () => {

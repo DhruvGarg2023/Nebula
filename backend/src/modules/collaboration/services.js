@@ -96,7 +96,6 @@ export async function getRoomPresence(roomId) {
   const members = await getRedisClient().smembers(key);
 
   const presenceList = [];
-  const now = Date.now();
 
   for (const memberStr of members) {
     try {

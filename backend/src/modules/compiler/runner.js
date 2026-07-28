@@ -22,7 +22,6 @@ export async function runCode({ language, sourceCode, onStdout, onStderr }) {
     let sourceFileName = '';
     let compileCmd = null;
     let compileArgs = [];
-    let binaryName = os.platform() === 'win32' ? 'app.exe' : './app';
 
     switch (normalizedLang) {
       case 'javascript':

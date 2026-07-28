@@ -13,7 +13,7 @@ export function initCompilerWorker() {
   workerInstance = new Worker(
     'compiler-queue',
     async (job) => {
-      const { jobId, roomId, userId, fileId, language, sourceCode } = job.data;
+      const { jobId, roomId, language, sourceCode } = job.data;
       logger.info({ jobId, roomId, language }, 'Worker processing compiler job');
 
       // Update status to running in DB

@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as roomService from '../services.js';
 import * as roomRepo from '../repositories.js';
-import { ForbiddenError, NotFoundError, ValidationError } from '../../../core/errors/AppError.js';
-import crypto from 'crypto';
+import { ForbiddenError, ValidationError } from '../../../core/errors/AppError.js';
 
 // Mock the repository layer
 vi.mock('../repositories.js');
@@ -72,6 +71,7 @@ describe('Room Services', () => {
       
       const inviteData = { role: 'editor', expiresInHours: 24 };
       const invitation = await roomService.createInvitation(mockRoom.id, mockUser.id, inviteData);
+      expect(invitation).toBeDefined();
 
       expect(roomRepo.createInvitation).toHaveBeenCalled();
       const callArgs = roomRepo.createInvitation.mock.calls[0][0];

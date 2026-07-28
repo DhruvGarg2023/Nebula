@@ -1,0 +1,73 @@
+name: Backend CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    name: Build, Lint & Test
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./backend
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: collab_editor
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: 1. Checkout Repository Code
+        uses: actions/checkout@v4
+
+      - name: 2. Setup Node.js 22 Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: 3. Install Backend Dependencies
+        run: npm ci
+
+      - name: 4. Validate Prisma Schema
+        run: npx prisma validate
+
+      - name: 5. Execute Code Linter
+        run: npm run lint
+
+      - name: 6. Run Automated Test Suite
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/collab_editor?schema=public
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: ci-pipeline-secret-key-32-chars-minimum!!
+          ENCRYPTION_KEY: ci-pipeline-encryption-key-32-chars!
+        run: npm test
+
+      - name: 7. Test Production Docker Image Build
+        run: docker build -t collaborative-editor-backend:latest .

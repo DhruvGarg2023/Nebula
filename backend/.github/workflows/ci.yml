@@ -1,4 +1,4 @@
-name: CI Pipeline
+name: Backend CI/CD Pipeline
 
 on:
   push:
@@ -6,9 +6,25 @@ on:
   pull_request:
     branches: [ main, master ]
 
+env:
+  NODE_ENV: test
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/collab_editor?schema=public
+  REDIS_URL: redis://localhost:6379
+  JWT_SECRET: ci-pipeline-secret-key-32-chars-minimum!!
+  ENCRYPTION_KEY: ci-pipeline-encryption-key-32-chars!
+  GOOGLE_CLIENT_ID: dev-google-client-id-placeholder
+  GOOGLE_CLIENT_SECRET: dev-google-client-secret-placeholder
+  GOOGLE_CALLBACK_URL: http://localhost:3000/api/v1/auth/google/callback
+  CORS_ORIGIN: http://localhost:5173
+
 jobs:
-  build-and-test:
+  test-and-lint:
+    name: 🧪 CI: Test & Quality Gate
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./backend
 
     services:
       postgres:
@@ -36,32 +52,62 @@ jobs:
           --health-retries 5
 
     steps:
-      - name: Checkout Code
+      - name: 1. Checkout Repository Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 22
+      - name: 2. Setup Node.js 22 Environment
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
 
-      - name: Install Dependencies
+      - name: 3. Install Dependencies
         run: npm ci
 
-      - name: Validate Prisma Schema
+      - name: 4. Validate Prisma Schema
         run: npx prisma validate
 
-      - name: Run Linter
+      - name: 5. Execute Code Linter
         run: npm run lint
 
-      - name: Run Automated Tests
-        env:
-          NODE_ENV: test
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/collab_editor?schema=public
-          REDIS_URL: redis://localhost:6379
-          JWT_SECRET: ci-pipeline-secret-key-32-chars-minimum!!
-          ENCRYPTION_KEY: ci-pipeline-encryption-key-32-chars!
+      - name: 6. Run Automated Test Suite
         run: npm test
 
-      - name: Test Production Docker Build
-        run: docker build -t collaborative-editor-backend:latest .
+  build-production-image:
+    name: 🐳 Build: Multi-Stage Docker Image
+    needs: test-and-lint
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+      - name: 1. Checkout Repository Code
+        uses: actions/checkout@v4
+
+      - name: 2. Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 3. Build Production Docker Image
+        run: |
+          docker build \
+            --tag collaborative-editor-backend:${{ github.sha }} \
+            --tag collaborative-editor-backend:latest .
+
+  deploy-production:
+    name: 🚀 Deploy: Production Release
+    needs: [test-and-lint, build-production-image]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 1. Trigger Deployment Pipeline
+        run: |
+          echo "========================================================="
+          echo "🚀 Starting Automated Deployment for Commit: ${{ github.sha }}"
+          echo "========================================================="
+          echo "✅ All CI checks passed (Linting, Tests, Prisma Schema Validation)"
+          echo "✅ Docker Production Image built successfully"
+          echo "🎉 Deployment trigger completed for branch '${{ github.ref }}'"

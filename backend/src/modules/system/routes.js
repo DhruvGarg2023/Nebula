@@ -1,6 +1,7 @@
 import { Router } from 'express';
+import swaggerUi from 'swagger-ui-express';
 import { healthCheck, readinessCheck } from './controllers.js';
-import { openApiSpec, renderSwaggerUiHtml } from './docs.js';
+import { openApiSpec } from './docs.js';
 import { getQueueStatus } from './bullBoard.js';
 import asyncHandler from '../../core/utils/asyncHandler.js';
 
@@ -19,8 +20,8 @@ router.get('/ready', asyncHandler(readinessCheck));
 // OpenAPI 3.0 Documentation Specification JSON
 router.get('/docs/openapi.json', (req, res) => res.json(openApiSpec));
 
-// Interactive Swagger UI
-router.get('/docs', (req, res) => res.setHeader('Content-Type', 'text/html').send(renderSwaggerUiHtml()));
+// Interactive Swagger UI (serves bundled CSS/JS locally)
+router.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
 
 // BullMQ Queue Monitoring Dashboard Status
 router.get('/queues', asyncHandler(getQueueStatus));

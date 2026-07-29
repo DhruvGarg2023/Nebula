@@ -71,10 +71,13 @@ jobs:
       - name: 4. Validate Prisma Schema
         run: npx prisma validate
 
-      - name: 5. Execute Code Linter
+      - name: 5. Push Prisma Schema to Database
+        run: npx prisma db push
+
+      - name: 6. Execute Code Linter
         run: npm run lint
 
-      - name: 6. Run Automated Test Suite
+      - name: 7. Run Automated Test Suite
         run: npm test
 
   # ════════════════════════════════════════════════════════════

@@ -2,33 +2,26 @@
 # Multi-stage Dockerfile for production
 # ═══════════════════════════════════════════════════════════════
 
-# ── Stage 1: Dependencies ──────────────────────────────────────
-FROM node:20-alpine AS deps
-WORKDIR /app
-RUN apk add --no-cache openssl
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
-
-# ── Stage 2: Build (Prisma generate) ──────────────────────────
+# ── Stage 1: Build (Dependencies & Prisma Generate) ────────────
 FROM node:20-alpine AS build
 WORKDIR /app
 RUN apk add --no-cache openssl
-COPY --from=deps /app/node_modules ./node_modules
 COPY package.json package-lock.json ./
+RUN npm ci
 COPY prisma ./prisma
 RUN npx prisma generate
 COPY src ./src
 
-# ── Stage 3: Production ───────────────────────────────────────
+# ── Stage 2: Production ───────────────────────────────────────
 FROM node:20-alpine AS production
 WORKDIR /app
 RUN apk add --no-cache openssl
 
-# Security: run as non-root
+# Security: run as non-root user
 RUN addgroup -g 1001 -S appgroup && \
     adduser -S appuser -u 1001 -G appgroup
 
-# Copy production dependencies and app code
+# Copy dependencies and application code
 COPY --from=build --chown=appuser:appgroup /app/node_modules ./node_modules
 COPY --from=build --chown=appuser:appgroup /app/prisma ./prisma
 COPY --from=build --chown=appuser:appgroup /app/src ./src

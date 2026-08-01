@@ -1,52 +1,27 @@
-import React from 'react';
-import { cn } from '@/lib/utils';
+import * as React from "react";
+import { cn } from "@/lib/utils";
 
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label?: string;
-  error?: string;
-  leftIcon?: React.ReactNode;
-  rightIcon?: React.ReactNode;
+export interface InputProps
+  extends React.InputHTMLAttributes<HTMLInputElement> {
+  error?: boolean;
 }
 
-export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, leftIcon, rightIcon, id, ...props }, ref) => {
-    const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
-
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ className, type, error, ...props }, ref) => {
     return (
-      <div className="w-full space-y-1.5">
-        {label && (
-          <label htmlFor={inputId} className="block text-xs font-medium text-slate-300">
-            {label}
-          </label>
+      <input
+        type={type}
+        className={cn(
+          "flex h-9 w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--gray-2))] px-3 py-1 text-sm text-[hsl(var(--foreground))] shadow-xs transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-[hsl(var(--gray-10))] focus-visible:border-[hsl(var(--ring))] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[hsl(var(--ring))] disabled:cursor-not-allowed disabled:opacity-50",
+          error && "border-[hsl(var(--error))] focus-visible:border-[hsl(var(--error))] focus-visible:ring-[hsl(var(--error))]",
+          className
         )}
-        <div className="relative flex items-center">
-          {leftIcon && (
-            <div className="absolute left-3 text-slate-400 pointer-events-none">
-              {leftIcon}
-            </div>
-          )}
-          <input
-            id={inputId}
-            ref={ref}
-            className={cn(
-              'glass-input w-full px-3.5 py-2 text-sm rounded-lg placeholder:text-slate-500',
-              leftIcon && 'pl-9',
-              rightIcon && 'pr-9',
-              error && 'border-rose-500/80 focus:border-rose-500 focus:ring-rose-500/25',
-              className
-            )}
-            {...props}
-          />
-          {rightIcon && (
-            <div className="absolute right-3 text-slate-400">
-              {rightIcon}
-            </div>
-          )}
-        </div>
-        {error && <p className="text-xs text-rose-400">{error}</p>}
-      </div>
+        ref={ref}
+        {...props}
+      />
     );
   }
 );
+Input.displayName = "Input";
 
-Input.displayName = 'Input';
+export { Input };

@@ -8,3 +8,5 @@ export * from "./animated-card";
 export * from "./search-input";
 export * from "./time-ago";
 export * from "./copy-button";
+export * from "./github-icon";
+export * from "./google-icon";

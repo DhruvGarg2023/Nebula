@@ -7,6 +7,13 @@ import type { ApiResponse, AuthResponse, DevLoginCredentials } from "@/types";
  */
 export const authApi = {
   /**
+   * GET /auth/github — Initiates GitHub OAuth flow.
+   * This is a browser redirect, not an API call.
+   */
+  getGithubAuthUrl: () =>
+    `${apiClient.defaults.baseURL}/auth/github`,
+
+  /**
    * GET /auth/google — Initiates Google OAuth flow.
    * This is a browser redirect, not an API call.
    */

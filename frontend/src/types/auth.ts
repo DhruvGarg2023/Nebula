@@ -7,6 +7,7 @@ export interface AuthUser {
   email: string;
   name: string;
   avatarUrl: string | null;
+  bio?: string;
   preferences: Record<string, unknown>;
   createdAt: string;
 }

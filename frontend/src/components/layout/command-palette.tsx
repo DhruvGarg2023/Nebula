@@ -16,9 +16,12 @@ import {
   Code2,
 } from "lucide-react";
 import { Dialog } from "@/components/ui/dialog";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/providers/auth-provider";
+import { roomsApi } from "@/services/api/rooms";
 import { ROUTES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import type { Room } from "@/types";
 
 interface CommandPaletteProps {
   open: boolean;
@@ -29,7 +32,7 @@ interface CommandPaletteProps {
 interface CommandItem {
   id: string;
   label: string;
-  category: "Navigation" | "Actions" | "Preferences";
+  category: "Navigation" | "Actions" | "Preferences" | "Workspaces";
   icon: React.ReactNode;
   shortcut?: string;
   onSelect: () => void;
@@ -49,8 +52,18 @@ export function CommandPalette({
   const [query, setQuery] = React.useState("");
   const [selectedIndex, setSelectedIndex] = React.useState(0);
 
-  const items: CommandItem[] = React.useMemo(
-    () => [
+  // Fetch recent rooms for quick navigation inside ⌘K
+  const { data: roomsResponse } = useQuery({
+    queryKey: ["rooms", "command-palette"],
+    queryFn: () => roomsApi.list({ limit: 8, page: 1 }),
+    enabled: open,
+    staleTime: 30 * 1000,
+  });
+
+  const rooms: Room[] = roomsResponse?.data?.data || [];
+
+  const items: CommandItem[] = React.useMemo(() => {
+    const baseItems: CommandItem[] = [
       {
         id: "nav-dashboard",
         label: "Go to Dashboard",
@@ -127,9 +140,21 @@ export function CommandPalette({
           logout();
         },
       },
-    ],
-    [router, onOpenChange, onCreateRoom, theme, setTheme, logout]
-  );
+    ];
+
+    const workspaceItems: CommandItem[] = rooms.map((room) => ({
+      id: `room-${room.id}`,
+      label: `Open workspace: ${room.name}`,
+      category: "Workspaces",
+      icon: <Code2 className="size-4 text-[hsl(var(--primary))]" />,
+      onSelect: () => {
+        router.push(ROUTES.ROOM(room.id));
+        onOpenChange(false);
+      },
+    }));
+
+    return [...baseItems, ...workspaceItems];
+  }, [router, onOpenChange, onCreateRoom, theme, setTheme, logout, rooms]);
 
   const filteredItems = React.useMemo(() => {
     if (!query.trim()) return items;

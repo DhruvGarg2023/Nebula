@@ -35,7 +35,16 @@ export interface InvitationDetails {
   room: {
     id: string;
     name: string;
+    description?: string | null;
+    language?: string;
+    isPublic?: boolean;
+    membersCount?: number;
   };
   role: Role;
   expiresAt: string;
+  inviter?: {
+    id: string;
+    name: string;
+    avatarUrl?: string | null;
+  };
 }

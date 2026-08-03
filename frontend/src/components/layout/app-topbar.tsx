@@ -58,8 +58,12 @@ export function AppTopbar({
   const { data: unreadCountData } = useQuery({
     queryKey: QUERY_KEYS.notifications.unreadCount,
     queryFn: async () => {
-      const res = await notificationsApi.getUnreadCount();
-      return res.data.data.count;
+      try {
+        const res = await notificationsApi.getUnreadCount();
+        return res?.data?.data?.count ?? 0;
+      } catch {
+        return 0;
+      }
     },
     refetchInterval: 30_000,
   });
@@ -70,8 +74,12 @@ export function AppTopbar({
   const { data: notificationsData } = useQuery({
     queryKey: QUERY_KEYS.notifications.list({ limit: 8 }),
     queryFn: async () => {
-      const res = await notificationsApi.list({ limit: 8 });
-      return res.data.data;
+      try {
+        const res = await notificationsApi.list({ limit: 8 });
+        return res?.data?.data ?? [];
+      } catch {
+        return [];
+      }
     },
     enabled: showNotifications,
   });

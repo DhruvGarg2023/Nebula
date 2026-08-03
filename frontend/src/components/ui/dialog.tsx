@@ -67,6 +67,18 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
   );
 }
 
+export function DialogContent({
+  className,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={cn("relative", className)} {...props}>
+      {children}
+    </div>
+  );
+}
+
 export function DialogHeader({
   className,
   ...props

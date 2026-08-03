@@ -7,6 +7,7 @@ export interface User {
   email: string;
   name: string;
   avatarUrl: string | null;
+  bio?: string;
   preferences: Record<string, unknown>;
   createdAt: string;
 }
@@ -14,6 +15,7 @@ export interface User {
 export interface UpdateProfileData {
   name?: string;
   avatarUrl?: string | null;
+  bio?: string;
   preferences?: Record<string, unknown>;
 }
 

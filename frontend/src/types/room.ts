@@ -15,6 +15,7 @@ export interface Room {
   createdAt: string;
   updatedAt: string;
   membership?: RoomMembership | null;
+  membersCount?: number;
   _count?: {
     members?: number;
     files?: number;

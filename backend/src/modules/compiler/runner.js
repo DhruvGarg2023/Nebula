@@ -147,12 +147,10 @@ function runProcess(command, args, cwd, timeoutMs, onStdout, onStderr) {
 
     child.on('error', (err) => {
       clearTimeout(timer);
-      let errMsg = '';
-      if (err.code === 'ENOENT') {
-        errMsg = `Command not found: ${command}. Please ensure runtime/compiler is installed.\n`;
-      } else {
-        errMsg = `Process error: ${err.message}\n`;
-      }
+      const errMsg =
+        err.code === 'ENOENT'
+          ? `Command not found: ${command}. Please ensure runtime/compiler is installed.\n`
+          : `Process error: ${err.message}\n`;
       stderr += errMsg;
       if (typeof onStderr === 'function') onStderr(errMsg);
       resolve({ stdout, stderr, exitCode: 1, timedOut });

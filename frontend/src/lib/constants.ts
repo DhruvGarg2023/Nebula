@@ -201,11 +201,10 @@ export const ROLE_HIERARCHY = ["viewer", "editor", "admin"] as const;
  * Supported programming languages (matches backend compiler).
  */
 export const SUPPORTED_LANGUAGES = [
-  { value: "javascript", label: "JavaScript", extension: ".js" },
-  { value: "python", label: "Python", extension: ".py" },
-  { value: "java", label: "Java", extension: ".java" },
-  { value: "c", label: "C", extension: ".c" },
-  { value: "cpp", label: "C++", extension: ".cpp" },
+  { value: "c", label: "C", extension: ".c", monacoId: "c" },
+  { value: "cpp", label: "C++", extension: ".cpp", monacoId: "cpp" },
+  { value: "python", label: "Python", extension: ".py", monacoId: "python" },
+  { value: "javascript", label: "JavaScript", extension: ".js", monacoId: "javascript" },
 ] as const;
 
 /**

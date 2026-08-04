@@ -15,7 +15,8 @@ COPY src ./src
 # ── Stage 2: Production ───────────────────────────────────────
 FROM node:20-alpine AS production
 WORKDIR /app
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl gcc g++ build-base python3 && \
+    ln -sf python3 /usr/bin/python
 
 # Security: run as non-root user
 RUN addgroup -g 1001 -S appgroup && \

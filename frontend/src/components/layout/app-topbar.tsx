@@ -205,7 +205,7 @@ export function AppTopbar({
               </div>
 
               <div className="mt-3 max-h-72 overflow-y-auto space-y-2">
-                {!notificationsData || notificationsData.length === 0 ? (
+                {!notificationsData || !Array.isArray(notificationsData) || notificationsData.length === 0 ? (
                   <div className="py-8 text-center text-xs text-[hsl(var(--muted-foreground))]">
                     No recent notifications
                   </div>

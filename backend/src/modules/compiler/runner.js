@@ -43,8 +43,11 @@ export async function runCode({ language, sourceCode, onStdout, onStderr }) {
       case 'c':
         sourceFileName = 'main.c';
         compileCmd = 'gcc';
-        compileArgs = [path.join(workDir, sourceFileName), '-o', path.join(workDir, 'app')];
-        command = path.join(workDir, 'app');
+        {
+          const exeName = os.platform() === 'win32' ? 'app.exe' : 'app';
+          compileArgs = [path.join(workDir, sourceFileName), '-o', path.join(workDir, exeName)];
+          command = path.join(workDir, exeName);
+        }
         args = [];
         break;
 
@@ -52,8 +55,11 @@ export async function runCode({ language, sourceCode, onStdout, onStderr }) {
       case 'c++':
         sourceFileName = 'main.cpp';
         compileCmd = 'g++';
-        compileArgs = [path.join(workDir, sourceFileName), '-o', path.join(workDir, 'app')];
-        command = path.join(workDir, 'app');
+        {
+          const exeName = os.platform() === 'win32' ? 'app.exe' : 'app';
+          compileArgs = [path.join(workDir, sourceFileName), '-o', path.join(workDir, exeName)];
+          command = path.join(workDir, exeName);
+        }
         args = [];
         break;
 
@@ -80,7 +86,7 @@ export async function runCode({ language, sourceCode, onStdout, onStderr }) {
       if (compileResult.exitCode !== 0) {
         return {
           stdout: compileResult.stdout,
-          stderr: `Compilation Error:\n${compileResult.stderr}`,
+          stderr: compileResult.stderr ? `Compilation Error:\n${compileResult.stderr}` : 'Compilation failed',
           exitCode: compileResult.exitCode,
           executionTimeMs: Date.now() - startTime,
           status: 'failed',
@@ -117,8 +123,9 @@ function runProcess(command, args, cwd, timeoutMs, onStdout, onStderr) {
 
     const child = spawn(command, args, {
       cwd,
-      env: { PATH: process.env.PATH },
+      env: process.env,
       windowsHide: true,
+      shell: os.platform() === 'win32',
     });
 
     const timer = setTimeout(() => {
@@ -140,11 +147,14 @@ function runProcess(command, args, cwd, timeoutMs, onStdout, onStderr) {
 
     child.on('error', (err) => {
       clearTimeout(timer);
+      let errMsg = '';
       if (err.code === 'ENOENT') {
-        stderr += `Command not found: ${command}. Please ensure runtime/compiler is installed.\n`;
+        errMsg = `Command not found: ${command}. Please ensure runtime/compiler is installed.\n`;
       } else {
-        stderr += `Process error: ${err.message}\n`;
+        errMsg = `Process error: ${err.message}\n`;
       }
+      stderr += errMsg;
+      if (typeof onStderr === 'function') onStderr(errMsg);
       resolve({ stdout, stderr, exitCode: 1, timedOut });
     });
 

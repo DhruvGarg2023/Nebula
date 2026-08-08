@@ -48,7 +48,6 @@ export function InviteDialog({
     "editor"
   );
   const [expiresInHours, setExpiresInHours] = React.useState<number>(168); // default 7 days
-  const [maxUses, setMaxUses] = React.useState<string>("");
   const [generatedInvite, setGeneratedInvite] = React.useState<Invitation | null>(
     null
   );
@@ -86,7 +85,7 @@ export function InviteDialog({
     },
     onSuccess: (res) => {
       const raw = (res as any).data ?? res;
-      const inv: Invitation = raw.data?.invitation || raw.invitation || raw;
+      const inv: Invitation = raw.data || raw;
       setGeneratedInvite(inv);
       toast.success("Invitation link generated!");
       queryClient.invalidateQueries({
@@ -156,7 +155,7 @@ export function InviteDialog({
               Generate New Invitation Link
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label className="text-[11px]">Role</Label>
                 <RoleSelector
@@ -179,17 +178,6 @@ export function InviteDialog({
                   <option value={168}>7 days</option>
                   <option value={720}>30 days</option>
                 </select>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-[11px]">Max Uses (Opt)</Label>
-                <Input
-                  type="number"
-                  placeholder="Unlimited"
-                  value={maxUses}
-                  onChange={(e) => setMaxUses(e.target.value)}
-                  className="h-7 text-xs"
-                />
               </div>
             </div>
 

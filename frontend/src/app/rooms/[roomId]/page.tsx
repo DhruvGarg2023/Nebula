@@ -93,6 +93,7 @@ export default function RoomWorkspacePage() {
   const [unsavedContents, setUnsavedContents] = React.useState<
     Record<string, string>
   >({});
+  const [currentJobId, setCurrentJobId] = React.useState<string | null>(null);
 
   // ── Fetch Files ─────────────────────────────────────────────
   const {
@@ -284,6 +285,11 @@ export default function RoomWorkspacePage() {
         sourceCode: currentContent,
         fileId: activeFile.id,
       });
+    },
+    onSuccess: (res) => {
+      if (res?.data?.data?.job?.id) {
+        setCurrentJobId(res.data.data.job.id);
+      }
     },
     onError: (err: any) => {
       toast.error(
@@ -587,6 +593,7 @@ export default function RoomWorkspacePage() {
                         onToggleCollapse={() =>
                           setTerminalCollapsed(!terminalCollapsed)
                         }
+                        jobId={currentJobId}
                       />
                     )}
                     {bottomTab === "chat" && (

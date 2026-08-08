@@ -24,6 +24,7 @@ export interface ExecuteCodeData {
   language: string;
   sourceCode: string;
   fileId?: string;
+  stdin?: string;
 }
 
 export interface CompilerStreamEvent {

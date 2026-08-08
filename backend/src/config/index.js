@@ -28,7 +28,7 @@ const envSchema = z.object({
   GOOGLE_CALLBACK_URL: z.string().url('GOOGLE_CALLBACK_URL must be a valid URL'),
 
   // CORS
-  CORS_ORIGIN: z.string().min(1, 'CORS_ORIGIN is required'),
+  CORS_ORIGIN: z.string().min(1, 'CORS_ORIGIN is required').transform((str) => str.split(',').map(s => s.trim())),
 
   // Logging
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),

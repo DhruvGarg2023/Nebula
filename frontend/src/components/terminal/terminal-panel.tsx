@@ -24,6 +24,7 @@ interface TerminalPanelProps {
   isRunning?: boolean;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  jobId?: string | null;
   className?: string;
 }
 
@@ -49,13 +50,32 @@ export function TerminalPanel({
   isRunning = false,
   isCollapsed = false,
   onToggleCollapse,
+  jobId,
   className,
 }: TerminalPanelProps) {
   const { connect, disconnect } = useSocket();
   const [lines, setLines] = React.useState<OutputLine[]>([]);
   const [status, setStatus] = React.useState<JobStatus | null>(null);
   const [executionTimeMs, setExecutionTimeMs] = React.useState<number | null>(null);
+  const [inputValue, setInputValue] = React.useState("");
+  const inputRef = React.useRef<HTMLInputElement>(null);
   const scrollRef = React.useRef<HTMLDivElement>(null);
+
+  // Auto-focus input when terminal becomes running
+  React.useEffect(() => {
+    if (isRunning && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isRunning]);
+
+  // Set status to running when a new jobId is received
+  React.useEffect(() => {
+    if (jobId) {
+      // eslint-disable-next-line react-hooks/exhaustive-deps, @typescript-eslint/no-unused-expressions
+      setStatus("running");
+      setExecutionTimeMs(null);
+    }
+  }, [jobId]);
 
   // Auto-scroll output to bottom
   React.useEffect(() => {
@@ -266,6 +286,42 @@ export function TerminalPanel({
                   {line.text}
                 </div>
               ))}
+              {(isRunning || status === "running") && jobId && (
+                <div className="flex items-center mt-1">
+                  <span className="text-emerald-500 font-bold mr-2">❯</span>
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        const chunk = inputValue;
+                        // Visually echo the input back
+                        setLines((prev) => [
+                          ...prev,
+                          {
+                            id: Math.random().toString(36).substr(2, 9),
+                            type: "stdout",
+                            text: chunk + "\n",
+                            timestamp: new Date().toISOString(),
+                          },
+                        ]);
+                        
+                        // Emit STDIN via socket
+                        const socket = connect("/compiler");
+                        if (socket) {
+                          socket.emit("compiler:stdin", { roomId, jobId, chunk });
+                        }
+                        
+                        setInputValue("");
+                      }
+                    }}
+                    className="flex-1 bg-transparent outline-none text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] placeholder:opacity-50 min-w-0"
+                    placeholder="Type input here and press Enter..."
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>

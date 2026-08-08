@@ -4,13 +4,35 @@ import path from 'node:path';
 import os from 'node:os';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../../core/logger/index.js';
+import { createRedisClient } from '../../core/redis/client.js';
+import config from '../../config/index.js';
+
+let subscriber = null;
+const activeJobs = new Map();
+
+function getSubscriber() {
+  if (!subscriber) {
+    subscriber = createRedisClient(config.REDIS_URL || process.env.REDIS_URL, 'runner_subscriber');
+    subscriber.psubscribe('job:stdin:*', (err) => {
+      if (err) logger.error({ err }, 'Failed to subscribe to STDIN channels');
+    });
+    subscriber.on('pmessage', (pattern, channel, message) => {
+      const jobId = channel.split(':').pop();
+      const childStdin = activeJobs.get(jobId);
+      if (childStdin && !childStdin.destroyed) {
+        childStdin.write(message + '\n');
+      }
+    });
+  }
+  return subscriber;
+}
 
 const TIMEOUT_MS = 5000; // 5 second hard limit for code execution
 
 /**
  * Runs code in a sandboxed temporary workspace with child process spawning.
  */
-export async function runCode({ language, sourceCode, onStdout, onStderr }) {
+export async function runCode({ jobId, language, sourceCode, stdin, onStdout, onStderr }) {
   const normalizedLang = (language || '').toLowerCase().trim();
   const workDir = path.join(os.tmpdir(), `collab_exec_${uuidv4()}`);
 
@@ -37,7 +59,7 @@ export async function runCode({ language, sourceCode, onStdout, onStderr }) {
       case 'python3':
         sourceFileName = 'script.py';
         command = os.platform() === 'win32' ? 'python' : 'python3';
-        args = [path.join(workDir, sourceFileName)];
+        args = ['-u', path.join(workDir, sourceFileName)];
         break;
 
       case 'c':
@@ -82,7 +104,7 @@ export async function runCode({ language, sourceCode, onStdout, onStderr }) {
 
     // Handle compilation step for C, C++, Java if needed
     if (compileCmd) {
-      const compileResult = await runProcess(compileCmd, compileArgs, workDir, TIMEOUT_MS, onStdout, onStderr);
+      const compileResult = await runProcess(null, compileCmd, compileArgs, workDir, TIMEOUT_MS, onStdout, onStderr);
       if (compileResult.exitCode !== 0) {
         return {
           stdout: compileResult.stdout,
@@ -95,7 +117,7 @@ export async function runCode({ language, sourceCode, onStdout, onStderr }) {
     }
 
     // Execute binary / script
-    const result = await runProcess(command, args, workDir, TIMEOUT_MS, onStdout, onStderr);
+    const result = await runProcess(jobId, command, args, workDir, TIMEOUT_MS, onStdout, onStderr, stdin);
     const executionTimeMs = Date.now() - startTime;
 
     return {
@@ -115,7 +137,7 @@ export async function runCode({ language, sourceCode, onStdout, onStderr }) {
   }
 }
 
-function runProcess(command, args, cwd, timeoutMs, onStdout, onStderr) {
+function runProcess(jobId, command, args, cwd, timeoutMs, onStdout, onStderr, stdinStr) {
   return new Promise((resolve) => {
     let stdout = '';
     let stderr = '';
@@ -127,6 +149,16 @@ function runProcess(command, args, cwd, timeoutMs, onStdout, onStderr) {
       windowsHide: true,
       shell: os.platform() === 'win32',
     });
+
+    if (stdinStr) {
+      child.stdin.write(stdinStr);
+      // We don't end the stream yet so interactive STDIN can still be pushed
+    }
+
+    if (jobId) {
+      getSubscriber(); // Ensure subscriber is running
+      activeJobs.set(jobId, child.stdin);
+    }
 
     const timer = setTimeout(() => {
       timedOut = true;
@@ -158,6 +190,9 @@ function runProcess(command, args, cwd, timeoutMs, onStdout, onStderr) {
 
     child.on('close', (code) => {
       clearTimeout(timer);
+      if (jobId) {
+        activeJobs.delete(jobId);
+      }
       resolve({
         stdout,
         stderr: timedOut ? `${stderr}\nExecution timed out after ${timeoutMs / 1000}s` : stderr,

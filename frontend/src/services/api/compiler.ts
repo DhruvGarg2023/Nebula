@@ -13,7 +13,7 @@ import type {
 export const compilerApi = {
   /** POST /rooms/:roomId/compiler/execute */
   execute: (roomId: string, data: ExecuteCodeData) =>
-    apiClient.post<ApiResponse<CompilerJob>>(
+    apiClient.post<ApiResponse<{ job: CompilerJob }>>(
       `/rooms/${roomId}/compiler/execute`,
       data
     ),

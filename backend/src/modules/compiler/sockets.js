@@ -3,6 +3,7 @@ import { socketAuth } from '../../core/middleware/socketAuth.js';
 import { SocketError } from '../../core/errors/SocketError.js';
 import logger from '../../core/logger/index.js';
 import * as roomRepo from '../room/repositories.js';
+import getRedisClient from '../../core/redis/client.js';
 
 export function registerCompilerNamespace() {
   const io = getIO();
@@ -38,6 +39,40 @@ export function registerCompilerNamespace() {
         }
       } catch (err) {
         logger.error({ err }, 'Error joining compiler room');
+        if (typeof callback === 'function') {
+          callback(err instanceof SocketError ? err.toJSON() : new SocketError(err.message).toJSON());
+        }
+      }
+    });
+
+    socket.on('compiler:stdin', async (payload, callback) => {
+      try {
+        const { roomId, jobId, chunk } = payload || {};
+        if (!roomId || !jobId || chunk === undefined) {
+          throw new SocketError('roomId, jobId, and chunk are required', 'BAD_REQUEST');
+        }
+
+        // Verify the user is a member of the room (for security)
+        const members = await roomRepo.listRoomMembers(roomId);
+        const isMember = members.some((m) => m.userId === socket.user.id);
+        
+        // Also check if room is public if not a member, but ideally only members should execute/send stdin
+        if (!isMember) {
+           const room = await roomRepo.findRoomById(roomId);
+           if (!room || !room.isPublic) {
+             throw new SocketError('Not a member of this room', 'NOT_MEMBER');
+           }
+        }
+
+        // Publish STDIN chunk to Redis channel for the specific job
+        const redisPub = getRedisClient();
+        await redisPub.publish(`job:stdin:${jobId}`, chunk);
+
+        if (typeof callback === 'function') {
+          callback({ success: true });
+        }
+      } catch (err) {
+        logger.error({ err }, 'Error handling compiler:stdin');
         if (typeof callback === 'function') {
           callback(err instanceof SocketError ? err.toJSON() : new SocketError(err.message).toJSON());
         }

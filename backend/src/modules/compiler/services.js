@@ -2,7 +2,7 @@ import * as compilerRepo from './repositories.js';
 import { compilerQueue } from '../../core/queue/index.js';
 import { AppError } from '../../core/errors/AppError.js';
 
-export async function submitExecutionJob({ roomId, userId, fileId, language, sourceCode }) {
+export async function submitExecutionJob({ roomId, userId, fileId, language, sourceCode, stdin }) {
   // 1. Create DB record for audit tracking
   const jobRecord = await compilerRepo.createCompilerJob({
     roomId,
@@ -23,6 +23,7 @@ export async function submitExecutionJob({ roomId, userId, fileId, language, sou
       fileId,
       language,
       sourceCode,
+      stdin,
     },
     {
       jobId: jobRecord.id,

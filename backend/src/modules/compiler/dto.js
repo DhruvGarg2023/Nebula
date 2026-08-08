@@ -8,6 +8,7 @@ export const executeCodeSchema = z.object({
   }),
   sourceCode: z.string().min(1, 'Source code cannot be empty').max(50000, 'Source code exceeds maximum length of 50KB'),
   fileId: z.string().uuid().optional(),
+  stdin: z.string().max(10000, 'Standard input exceeds maximum length of 10KB').optional(),
 });
 
 export const listJobsSchema = z.object({

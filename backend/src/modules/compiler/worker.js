@@ -13,7 +13,7 @@ export function initCompilerWorker() {
   workerInstance = new Worker(
     'compiler-queue',
     async (job) => {
-      const { jobId, roomId, language, sourceCode } = job.data;
+      const { jobId, roomId, language, sourceCode, stdin } = job.data;
       logger.info({ jobId, roomId, language }, 'Worker processing compiler job');
 
       // Update status to running in DB
@@ -21,8 +21,10 @@ export function initCompilerWorker() {
 
       // Run code with real-time stream handlers
       const result = await runner.runCode({
+        jobId,
         language,
         sourceCode,
+        stdin,
         onStdout: (chunk) => streamStdout(roomId, jobId, chunk),
         onStderr: (chunk) => streamStderr(roomId, jobId, chunk),
       });

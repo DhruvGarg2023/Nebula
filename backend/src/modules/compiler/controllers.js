@@ -2,7 +2,7 @@ import * as compilerService from './services.js';
 
 export async function execute(req, res) {
   const { roomId } = req.params;
-  const { language, sourceCode, fileId } = req.body;
+  const { language, sourceCode, fileId, stdin } = req.body;
 
   const job = await compilerService.submitExecutionJob({
     roomId,
@@ -10,6 +10,7 @@ export async function execute(req, res) {
     fileId,
     language,
     sourceCode,
+    stdin,
   });
 
   res.status(202).json({

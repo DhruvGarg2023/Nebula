@@ -39,7 +39,7 @@ export class SocketManager {
     const socket = io(`${this.baseUrl}${namespace}`, {
       auth: { token },
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: 10000,
@@ -54,10 +54,39 @@ export class SocketManager {
       socket.on("disconnect", (reason) => {
         console.log(`[Socket] Disconnected from ${namespace}: ${reason}`);
       });
-      socket.on("connect_error", (err) => {
-        console.warn(`[Socket] Connection error on ${namespace}:`, err.message);
-      });
     }
+
+    // Auto-refresh token on connection errors
+    socket.on("connect_error", (err) => {
+      if (process.env.NODE_ENV === "development") {
+        console.warn(`[Socket] Connection error on ${namespace}:`, err.message);
+      }
+      
+      if (err.message.includes("Token expired") || err.message.includes("Authentication")) {
+        // Dynamically import apiClient to avoid circular dependencies
+        import("../api/client").then(({ default: apiClient, getAccessToken }) => {
+          const currentToken = getAccessToken();
+          const auth = socket.auth as { token?: string } | undefined;
+          
+          // If we already have a new token, use it
+          if (currentToken && auth && auth.token !== currentToken) {
+            auth.token = currentToken;
+            if (socket.disconnected) socket.connect();
+            return;
+          }
+          // Otherwise, trigger a network request to force the interceptor to refresh it
+          apiClient.get("/auth/me").then(() => {
+            const refreshedToken = getAccessToken();
+            if (refreshedToken && auth) {
+              auth.token = refreshedToken;
+              if (socket.disconnected) socket.connect();
+            }
+          }).catch(() => {
+            // If refresh fails, it will redirect to login naturally
+          });
+        });
+      }
+    });
 
     this.sockets.set(key, socket);
     return socket;
